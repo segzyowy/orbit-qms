@@ -1,3 +1,7 @@
+# Optional on-chain payment requests
+
+A new contract-based flow is available at `contracts.html`. Read **DEPLOYMENT.md** first. The contract is not yet deployed; `contract-config.js` intentionally has an empty address. Source and frontend have been prepared, but compilation and EVM/live-wallet testing remain to be performed. Existing direct-transfer functionality below is unchanged.
+
 # Orbit — QMS Testnet Payments
 
 A static, non-custodial native-QMS payments MVP. Open `index.html` in the workspace preview. No build step, backend, API keys, or custom smart contract is required.
