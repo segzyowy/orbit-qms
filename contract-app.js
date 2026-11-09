@@ -5,7 +5,7 @@ let wallet,signer,contract,owner,busy=false,loaded=null;
 const address=window.ORBIT_CONTRACT_ADDRESS||'';
 const message=text=>{el('contract-message').textContent=text;};
 function error(e){return e.shortMessage||e.reason||e.message||String(e);}
-function buttons(){el('contract-connect').disabled=busy;el('chain-create-button').disabled=busy||!contract;el('chain-load-button').disabled=busy||!contract;el('chain-pay').disabled=busy||!loaded||loaded.status!==1n;el('chain-cancel').disabled=busy||!loaded||loaded.status!==1n||loaded.recipient.toLowerCase()!==owner?.toLowerCase();}
+function buttons(){el('contract-connect').disabled=busy;el('contract-connect').textContent=owner?'Connected: '+owner.slice(0,6)+'…'+owner.slice(-4):'Connect wallet';el('chain-create-button').disabled=busy||!contract;el('chain-load-button').disabled=busy||!contract;el('chain-pay').disabled=busy||!loaded||loaded.status!==1n;el('chain-cancel').disabled=busy||!loaded||loaded.status!==1n||loaded.recipient.toLowerCase()!==owner?.toLowerCase();}
 function reset(){contract=null;signer=null;owner=null;loaded=null;el('contract-wallet').textContent='Wallet changed. Reconnect to continue.';el('chain-details').textContent='Reconnect and reload the request.';buttons();}
 async function guard(){if(!contract||!window.ethereum)throw Error('Connect your wallet first.');if(BigInt(await window.ethereum.request({method:'eth_chainId'}))!==19480n)throw Error('Switch to QMS Testnet and reconnect.');const accounts=await window.ethereum.request({method:'eth_accounts'});if(accounts[0]?.toLowerCase()!==owner.toLowerCase())throw Error('Account changed. Reconnect.');}
 async function action(fn){if(busy)return;busy=true;buttons();try{await fn();}catch(e){message(error(e));}finally{busy=false;buttons();}}
@@ -50,4 +50,4 @@ const query=new URLSearchParams(location.search);if(query.has('request')){el('ch
 // Preserve the wallet session when navigating here from the dashboard. This is a
 // silent check only: first-time connections still require the Connect wallet button.
 if(window.ethereum?.request)action(async()=>{try{await connect(false);}catch(e){if(!/No wallet account is connected|Switch to QMS Testnet/.test(error(e)))message(error(e));}});
-buttons(); 
+buttons();
