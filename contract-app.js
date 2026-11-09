@@ -13,18 +13,24 @@ async function receipt(tx){el('contract-tx').href=chain.blockExplorerUrls[0]+'/t
 function id(){const value=el('chain-id').value.trim();if(!/^0x[0-9a-fA-F]{64}$/.test(value))throw Error('Enter a valid 32-byte request ID.');return value;}
 async function lookup(){await guard();const key=id();const r=await contract.requests(key);loaded={id:key,recipient:r.recipient,amount:r.amount,status:r.status};el('chain-details').textContent=r.status===0n?'Request not found on this deployment.':`Request: ${key}\nRecipient: ${r.recipient}\nAmount: ${ethers.formatEther(r.amount)} test QMS\nStatus: ${['Missing','Open','Paid','Cancelled'][Number(r.status)]}\nPayer: ${r.payer}`;buttons();}
 el('contract-address').textContent=address?'Configured contract: '+address:'Not deployed/configured yet. Follow DEPLOYMENT.md, then set contract-config.js. No contract transactions are available until then.';
-el('contract-connect').onclick=()=>action(async()=>{
+async function connect(requestAccess){
  if(!window.ethers)throw Error('Wallet library did not load. Include vendor/ethers.umd.min.js in your upload.');
  if(!ethers.isAddress(address)||address===ethers.ZeroAddress)throw Error('Deploy the contract and set its address in contract-config.js first.');
  if(!window.ethereum?.request)throw Error('Open this site in an EVM wallet browser or a desktop browser with a wallet extension.');
- if(BigInt(await ethereum.request({method:'eth_chainId'}))!==19480n){try{await ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:chain.chainId}]});}catch(e){if(e.code!==4902)throw e;await ethereum.request({method:'wallet_addEthereumChain',params:[chain]});await ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:chain.chainId}]});}}
- await ethereum.request({method:'eth_requestAccounts'});wallet=new ethers.BrowserProvider(ethereum);signer=await wallet.getSigner();owner=await signer.getAddress();
+ if(BigInt(await ethereum.request({method:'eth_chainId'}))!==19480n){
+  if(!requestAccess)throw Error('Switch to QMS Testnet, then reconnect.');
+  try{await ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:chain.chainId}]});}catch(e){if(e.code!==4902)throw e;await ethereum.request({method:'wallet_addEthereumChain',params:[chain]});await ethereum.request({method:'wallet_switchEthereumChain',params:[{chainId:chain.chainId}]});}
+ }
+ const accounts=await ethereum.request({method:requestAccess?'eth_requestAccounts':'eth_accounts'});
+ if(!accounts.length)throw Error('No wallet account is connected.');
+ wallet=new ethers.BrowserProvider(ethereum);signer=await wallet.getSigner();owner=await signer.getAddress();
  if((await wallet.getNetwork()).chainId!==19480n)throw Error('Wrong chain.');
  if(await wallet.getCode(address)==='0x')throw Error('No contract at this address. Check deployment or testnet reset.');
  const candidate=new ethers.Contract(address,window.ORBIT_REQUEST_ABI,signer);
  if(await candidate.version()!=='orbit-payment-requests-v1')throw Error('Unexpected contract interface.');
  contract=candidate;el('contract-wallet').textContent='Connected: '+owner;message('QMS Testnet connected. Review every wallet prompt.');if(el('chain-id').value)await lookup();
-});
+}
+el('contract-connect').onclick=()=>action(()=>connect(true));
 if(window.ethereum?.on){ethereum.on('accountsChanged',reset);ethereum.on('chainChanged',reset);ethereum.on('disconnect',reset);}
 el('chain-create').onsubmit=e=>{e.preventDefault();action(async()=>{
  await guard();const c=contract;const text=el('chain-amount').value.trim();if(!/^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/.test(text))throw Error('Use a positive decimal amount, up to 18 decimals.');const amount=ethers.parseEther(text);if(amount<=0n||amount>ethers.MaxUint256)throw Error('Invalid amount.');
@@ -41,4 +47,7 @@ el('chain-pay').onclick=()=>action(async()=>{
 el('chain-cancel').onclick=()=>action(async()=>{await lookup();if(loaded.recipient.toLowerCase()!==owner.toLowerCase())throw Error('Only the recipient can cancel.');if(!confirm('Cancel this request? This costs testnet gas.'))return;const key=loaded.id,c=contract;await guard();await receipt(await c.cancelRequest(key));await lookup();});
 el('chain-copy').onclick=async()=>{try{await navigator.clipboard.writeText(el('chain-share').value);message('Request link copied.');}catch{el('chain-share').select();message('Copy the selected link manually.');}};
 const query=new URLSearchParams(location.search);if(query.has('request')){el('chain-id').value=query.get('request');message('Connect to load this request from the configured contract. Never trust a recipient without reviewing it.');}
-buttons();
+// Preserve the wallet session when navigating here from the dashboard. This is a
+// silent check only: first-time connections still require the Connect wallet button.
+if(window.ethereum?.request)action(async()=>{try{await connect(false);}catch(e){if(!/No wallet account is connected|Switch to QMS Testnet/.test(error(e)))message(error(e));}});
+buttons(); 
